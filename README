@@ -21,6 +21,8 @@ and priority is one of:
 ident is prepended to every message, and is typically set to the application name
 message is what is meant to be sent to syslog
 
+facility and priority should be constant strings.  i.e., they should not change while iterating over a result set
+
 to compile (on linux, for example):
 gcc `mysql_config --cflags` -fPIC -shared -o lib_mysqludf_syslog.so lib_mysqludf_syslog.c
 
