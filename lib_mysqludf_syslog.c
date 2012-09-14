@@ -124,6 +124,7 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
   syslog_udf_data *sud = NULL;
   initid->maybe_null=0;
 
+
   if (args->arg_count != 4) {
     strcpy(message, "usage: syslog_write(facility, priority, identity, message)");
     return 1;
@@ -160,25 +161,17 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
   }
   sud->facility=facility;
   sud->priority=priority;
-  /* copy identity and message into internal null terminated buffers */
-  if ((sud->message = (char *) malloc((args->lengths[3]+1) * sizeof(char))) == NULL) {
+  /* create null filled buffers to hold message and identity plus a null terminating character */
+  if ((sud->message = (char *) calloc((args->lengths[3]+1), sizeof(char))) == NULL) {
     strcpy(message, "memory allocation error for message buff");
     free(sud);
     return 1;
   }
-  else {
-    memcpy(sud->message, args->args[3], args->lengths[3]);
-    sud->message[args->lengths[3]] = '\0';
-  }
-  if ((sud->identity= (char *) malloc((args->lengths[2]+1) * sizeof(char))) == NULL) {
+  if ((sud->identity= (char *) calloc((args->lengths[2]+1), sizeof(char))) == NULL) {
     strcpy(message, "memory allocation error for identity buff");
     free(sud->message);
     free(sud);
     return 1;
-  }
-  else {
-    memcpy(sud->identity, args->args[2], args->lengths[2]);
-    sud->identity[args->lengths[2]] = '\0';
   }
   initid->ptr = (char *) sud;
   return 0;
@@ -198,9 +191,18 @@ void syslog_write_deinit(UDF_INIT *initid) {
 
 long long syslog_write(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error) {
   syslog_udf_data *sud = (syslog_udf_data *)initid->ptr;
+  if (args->args[2]) {
+	memcpy(sud->identity, args->args[2], args->lengths[2]);
+  }
+  if (args->args[3]) {
+	memcpy(sud->message, args->args[3], args->lengths[3]);
+  }
+
   openlog((const char *)sud->identity, LOG_ODELAY, sud->facility);
   syslog(sud->priority,"%s",sud->message);
   closelog();
+  bzero(sud->identity, args->lengths[2]);
+  bzero(sud->message, args->lengths[3]);
   *is_null = 0;
   *error = 0;
   return 0;
