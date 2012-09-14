@@ -25,8 +25,12 @@ and priority is one of:
 ident is prepended to every message, and is typically set to the application name
 message is what is meant to be sent to syslog
 
+facility and priority should be constant strings.  i.e., they should not change while iterating over a result set
+
 to compile (on linux, for example):
 gcc `mysql_config --cflags` -fPIC -shared -o lib_mysqludf_syslog.so lib_mysqludf_syslog.c
+
+
 
 NOTE: most likely this will never compile on Windows, though it is vaguely possible that it could interface with syslog installed via cygwin.
 
@@ -145,9 +149,15 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
     strcpy(message, "message should be a string");
     return 1;
   }
+  if (!args->args[0]) {
+	strcpy(message, "facility must be a constant string");
+  }
   if ((facility = decode_facility(args->args[0], args->lengths[0])) == -1) {
     strcpy(message, "facility not recognized");
     return 1;
+  }
+  if (!args->args[1]) {
+	strcpy(message, "priority must be a constant string");
   }
   if ((priority = decode_priority(args->args[1], args->lengths[1])) == -1) {
     strcpy(message, "priority not recognized");
