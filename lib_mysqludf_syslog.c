@@ -151,6 +151,7 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
   }
   if (!args->args[0]) {
 	strcpy(message, "facility must be a constant string");
+	return 1;
   }
   if ((facility = decode_facility(args->args[0], args->lengths[0])) == -1) {
     strcpy(message, "facility not recognized");
@@ -158,6 +159,7 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
   }
   if (!args->args[1]) {
 	strcpy(message, "priority must be a constant string");
+	return 1;
   }
   if ((priority = decode_priority(args->args[1], args->lengths[1])) == -1) {
     strcpy(message, "priority not recognized");
