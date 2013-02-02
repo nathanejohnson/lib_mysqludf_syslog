@@ -5,6 +5,7 @@ Function is called as:
 syslog_write(facility, priority, ident, log_message)
 
 where facility is one of:
+
      'LOG_AUTH'      The authorization system: login(1), su(1), getty(8), etc.
 
      'LOG_AUTHPRIV'  The same as LOG_AUTH, but logged to a file readable only by selected individuals.
@@ -17,6 +18,7 @@ where facility is one of:
 
 
 and priority is one of:
+
       LOG_EMERG   system is unusable
 
       LOG_ALERT    action must be taken immediately
