@@ -25,7 +25,7 @@ and priority is one of:
 ident is prepended to every message, and is typically set to the application name
 message is what is meant to be sent to syslog
 
-facility and priority should be constant strings.  i.e., they should not change while iterating over a result set
+facility, priority and identity should be constant strings.  i.e., they should not change while iterating over a result set
 
 to compile (on linux, for example):
 gcc `mysql_config --cflags` -fPIC -shared -o lib_mysqludf_syslog.so lib_mysqludf_syslog.c
@@ -57,9 +57,9 @@ after copying syslog_udf.so to the appropriate place (plugin dir), or setting LD
  * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
-#define LIBVERSION "lib_mysqludf_syslog version 0.0.1"
+#define LIBVERSION "lib_mysqludf_syslog version 0.0.3"
 
-
+/* just because this is here doesn't mean it will compile on windows.  But why not.  */
 #if defined(_WIN32) || defined(_WIN64) || defined(__WIN32__) || defined(WIN32)
 #define DLLEXP __declspec(dllexport)
 #else
@@ -116,18 +116,12 @@ char* lib_mysqludf_syslog_info(UDF_INIT *initid, UDF_ARGS *args, char* result, u
 }
 
 
-
-
-
-
 /* Definitions */
 
 my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
   int facility;
   int priority;
   syslog_udf_data *sud = NULL;
-  initid->maybe_null=0;
-
 
   if (args->arg_count != 4) {
     strcpy(message, "usage: syslog_write(facility, priority, identity, message)");
@@ -165,6 +159,10 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
     strcpy(message, "priority not recognized");
     return 1;
   }
+  if (!args->args[2]) {
+	strcpy(message, "identity must be a constant string");
+	return 1;
+  }
 
   /* copy data into syslog_udf_data structure */
   if((  sud = (syslog_udf_data *) malloc(sizeof(syslog_udf_data))) == NULL) {
@@ -173,22 +171,25 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
   }
   sud->facility=facility;
   sud->priority=priority;
-  /* create null filled buffers to hold message and identity plus a null terminating character */
-  if ((sud->message = (char *) calloc((args->lengths[3]+1), sizeof(char))) == NULL) {
-    strcpy(message, "memory allocation error for message buff");
-    free(sud);
-    return 1;
-  }
+  /* create null filled buffers to hold message plus a null terminating character */
   if ((sud->identity= (char *) calloc((args->lengths[2]+1), sizeof(char))) == NULL) {
     strcpy(message, "memory allocation error for identity buff");
     free(sud->message);
     free(sud);
     return 1;
   }
+  strncpy(sud->identity, args->args[2], args->lengths[2]);
+  if ((sud->message = (char *) calloc((args->lengths[3]+1), sizeof(char))) == NULL) {
+    strcpy(message, "memory allocation error for message buff");
+    free(sud);
+    return 1;
+  }
   initid->ptr = (char *) sud;
+  openlog((const char *)sud->identity, LOG_ODELAY, sud->facility);
   return 0;
 }
 void syslog_write_deinit(UDF_INIT *initid) {
+  closelog();
   syslog_udf_data *sud = (syslog_udf_data *) initid->ptr;
   if (sud) {
     if (sud->message) {
@@ -199,22 +200,17 @@ void syslog_write_deinit(UDF_INIT *initid) {
     }
     free(sud);
   }
+  initid->ptr = NULL;
 }
 
 long long syslog_write(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error) {
   syslog_udf_data *sud = (syslog_udf_data *)initid->ptr;
-  if (args->args[2]) {
-	memcpy(sud->identity, args->args[2], args->lengths[2]);
-  }
   if (args->args[3]) {
-	memcpy(sud->message, args->args[3], args->lengths[3]);
+      // buffer is guaranteed large enough by init function.
+      *(stpncpy(sud->message, args->args[3], args->lengths[3])) = '\0';
   }
 
-  openlog((const char *)sud->identity, LOG_ODELAY, sud->facility);
   syslog(sud->priority,"%s",sud->message);
-  closelog();
-  bzero(sud->identity, args->lengths[2]);
-  bzero(sud->message, args->lengths[3]);
   *is_null = 0;
   *error = 0;
   return 0;
