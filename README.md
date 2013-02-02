@@ -41,17 +41,18 @@ message is what is meant to be sent to syslog
 facility, priority and identity should be constant strings.  i.e., they should not change while iterating over a result set
 
 to compile (on linux, for example):
+````
 gcc `mysql_config --cflags` -fPIC -shared -o lib_mysqludf_syslog.so lib_mysqludf_syslog.c
-
+````
 
 
 NOTE: most likely this will never compile on Windows, though it is vaguely possible that it could interface with syslog installed via cygwin.
 
 to create function:
-
+````
 create function lib_mysqludf_syslog_info returns string soname 'lib_mysqludf_syslog.so';
 create function syslog_write returns integer soname 'lib_mysqludf_syslog.so';
-
+````
 after copying syslog_udf.so to the appropriate place (plugin dir), or setting LD_LIBRARY_PATH as per the documentation
 
 
