@@ -172,35 +172,21 @@ my_bool syslog_write_init(UDF_INIT *initid, UDF_ARGS *args, char *message) {
   sud->facility=facility;
   sud->priority=priority;
   /* create null filled buffers to hold message plus a null terminating character */
-  if ((sud->identity= (char *) calloc((args->lengths[2]+1), sizeof(char))) == NULL) {
+  if ((sud->message = (char *) malloc((args->lengths[3]+1) * sizeof(char))) == NULL) {
+    strcpy(message, "memory allocation error for message buff");
+    free(sud);
+    return 1;
+  }
+  if ((sud->identity= (char *) malloc((args->lengths[2]+1) * sizeof(char))) == NULL) {
     strcpy(message, "memory allocation error for identity buff");
     free(sud->message);
     free(sud);
     return 1;
   }
-  strncpy(sud->identity, args->args[2], args->lengths[2]);
-  if ((sud->message = (char *) calloc((args->lengths[3]+1), sizeof(char))) == NULL) {
-    strcpy(message, "memory allocation error for message buff");
-    free(sud);
-    return 1;
-  }
+  *(stpncpy(sud->identity, args->args[2], args->lengths[2])) = '\0';
   initid->ptr = (char *) sud;
   openlog((const char *)sud->identity, LOG_ODELAY, sud->facility);
   return 0;
-}
-void syslog_write_deinit(UDF_INIT *initid) {
-  closelog();
-  syslog_udf_data *sud = (syslog_udf_data *) initid->ptr;
-  if (sud) {
-    if (sud->message) {
-      free(sud->message);
-    }
-    if (sud->identity) {
-      free(sud->identity);
-    }
-    free(sud);
-  }
-  initid->ptr = NULL;
 }
 
 long long syslog_write(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error) {
@@ -208,13 +194,30 @@ long long syslog_write(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *er
   if (args->args[3]) {
       // buffer is guaranteed large enough by init function.
       *(stpncpy(sud->message, args->args[3], args->lengths[3])) = '\0';
+      syslog(sud->priority,"%s",sud->message);
   }
-
-  syslog(sud->priority,"%s",sud->message);
   *is_null = 0;
   *error = 0;
   return 0;
 }
+
+void syslog_write_deinit(UDF_INIT *initid) {
+  closelog();
+  syslog_udf_data *sud = (syslog_udf_data *) initid->ptr;
+  if (sud) {
+    if (sud->message) {
+      free(sud->message);
+      sud->message = NULL;
+    }
+    if (sud->identity) {
+      free(sud->identity);
+      sud->identity = NULL;
+    }
+    free(sud);
+  }
+  initid->ptr = NULL;
+}
+
 
 int decode_facility(char *facility_txt, unsigned long length) {
   char *fac_trim = NULL;
